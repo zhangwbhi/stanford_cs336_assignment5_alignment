@@ -168,11 +168,8 @@ def main(
 
     global POLICY_DEVICE, VLLM_DEVICE
 
-    if device == "cpu":
-        POLICY_DEVICE = "cpu"
-        VLLM_DEVICE = "cuda"
 
-    if device == "cuda" and torch.cuda.device_count() < 2:
+    if torch.cuda.device_count() < 2:
         print("Error: this script requires at least 2 GPUs.")
         return
 
@@ -210,7 +207,7 @@ def main(
     policy_model = AutoModelForCausalLM.from_pretrained(
         MODEL_PATH,
         torch_dtype=torch.bfloat16,
-        attn_implementation="flash_attention_2" if device=="cuda" else None,
+        attn_implementation="flash_attention_2",
     ).to(POLICY_DEVICE)
 
     policy_model.train()
