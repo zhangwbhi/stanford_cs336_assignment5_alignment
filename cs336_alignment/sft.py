@@ -37,8 +37,8 @@ SFT_DATA_PATH = "../data/gsm8k/train.jsonl"
 VALID_DATA_PATH = "../data/gsm8k/test.jsonl"
 PROMPT_PATH = "./prompts/r1_zero.prompt"
 
-VLLM_DEVICE = "cuda: 0"
-POLICY_DEVICE = "cuda: 1"
+VLLM_DEVICE = "cuda:0"
+POLICY_DEVICE = "cuda:1"
 
 
 def init_vllm(
@@ -96,7 +96,7 @@ def collate_fn(
     prompts = [
         prompt_template.format(question=item["question"]) for item in batch
     ]
-    responses = [item["answer"] for item in batch]
+    responses = [item["answer"].replace("\n####", " </think> <answer>") + " </answer>" for item in batch]
 
     tokenized_batch = tokenize_prompt_and_output(
         prompt_strs=prompts,
@@ -125,14 +125,14 @@ def evaluate(
         batch_examples = validation_examples[i : i + eval_batch_size]
 
         prompts = [
-            prompt_template.fomat(question=ex["question"]) for ex in batch_examples
+            prompt_template.format(question=ex["question"]) for ex in batch_examples
         ]
         ground_truths = [
             parse_ground_truth(ex["answer"]) for ex in batch_examples
         ]
 
         outputs = vllm_model.generate(prompts, eval_sampling_params)
-        generated_responses = [out.output[0].text.strip() for out in outputs]
+        generated_responses = [out.outputs[0].text.strip() for out in outputs]
 
         for j in range(len(generated_responses)):
             reward_data = reward_fn(generated_responses[j], ground_truths[j])
@@ -151,10 +151,10 @@ def evaluate(
 
 
 def main(
-    learning_rate: float = typer.Option(5e-6, help="Learning rate for AdamW."),
+    learning_rate: float = typer.Option(1e-5, help="Learning rate for AdamW."),
     batch_size: int = typer.Option(16, help="Microbatch size."),
     gradient_accumulation_steps: int = typer.Option(8, help="Number of gradient accumulation steps."),
-    num_train_epochs: int = typer.Option(1, help="Number of training epochs."),
+    num_train_epochs: int = typer.Option(36, help="Number of training epochs."),
     n_sft_examples: Optional[int] = typer.Option(None, help="Number of SFT examples to use. None for all."),
     eval_every_n_steps: int = typer.Option(100, help="Run evaluation every N global steps."),
     log_every_n_steps: int = typer.Option(10, help="Log training metrics every N global steps."),
@@ -268,9 +268,9 @@ def main(
         optimizer.zero_grad()
 
         for batch_idx, batch in enumerate(tqdm(train_dataloader)):
-            input_ids = batch["input_ids"]
-            labels = batch["labels"]
-            response_mask = batch["response_mask"]
+            input_ids = batch["input_ids"].to(POLICY_DEVICE)
+            labels = batch["labels"].to(POLICY_DEVICE)
+            response_mask = batch["response_mask"].to(POLICY_DEVICE)
 
             log_probs_data = get_response_log_probs(
                 policy_model,

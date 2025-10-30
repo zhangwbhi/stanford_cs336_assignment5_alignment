@@ -254,7 +254,7 @@ def log_generations(
     Returns:
         A dictionary containing aggregated metrics for logging (e.g., to wandb).
     """
-    prompts = [prompt_template.format(question=ex["questions"]) for ex in examples]
+    prompts = [prompt_template.format(question=ex["question"]) for ex in examples]
     ground_truths = [parse_ground_truth(ex["answer"]) for ex in examples]
 
     outputs = vllm_model.generate(prompts, sampling_params)
