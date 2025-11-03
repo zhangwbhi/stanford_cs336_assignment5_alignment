@@ -5,6 +5,10 @@ from transformers import PreTrainedTokenizer, PreTrainedModel
 from typing import List, Dict, Any, Callable
 from vllm import LLM, SamplingParams
 import json
+import re
+
+ANS_RE = re.compile(r"####\s*([\-0-9\.\,]+)")
+
 
 def tokenize_prompt_and_output(
     prompt_strs: List[str],
@@ -227,6 +231,13 @@ def parse_ground_truth(gt_answer: str) -> str:
     else:
         # Fallback if the '####' separator isn't present
         return gt_answer.strip()
+
+
+def extract_reference_answer(answer: str) -> str:
+    match = ANS_RE.search(answer)
+    if match:
+        return match.group(1).strip().replace(",", "")
+    return "[invalid]"
 
 
 @torch.inference_mode()
