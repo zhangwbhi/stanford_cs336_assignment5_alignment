@@ -125,7 +125,7 @@ def main(
     learning_rate: float = typer.Option(2e-5, help="Learning rate for AdamW."),
     batch_size: int = typer.Option(8, help="Microbatch size."),
     gradient_accumulation_steps: int = typer.Option(8, help="Number of gradient accumulation steps."),
-    num_train_epochs: int = typer.Option(4, help="Number of training epochs."),
+    num_train_epochs: int = typer.Option(2, help="Number of training epochs."),
     n_sft_examples: Optional[int] = typer.Option(None, help="Number of SFT examples to use. None for all."),
     eval_every_n_steps: int = typer.Option(100, help="Run evaluation every N global steps."),
     log_every_n_steps: int = typer.Option(10, help="Log training metrics every N global steps."),
@@ -284,7 +284,7 @@ def main(
                     stats = evaluate_vllm(
                         vllm, r1_zero_reward_fn, validation_data_prompts, validation_data_answers, eval_sampling_params
                     )
-                    accuracy = stats["correct"] / stats["count"]
+                    accuracy = stats["eval/correct"] / len(validation_data_prompts)
 
                     # 3. Run qualitative logging
                     log_gen_metrics = log_generations(
@@ -306,6 +306,7 @@ def main(
                         "eval/avg_incorrect_response_length": log_gen_metrics["avg_incorrect_response_length"],
                         "eval/avg_token_entropy": log_gen_metrics["avg_token_entropy"],
                     }
+                    wandb.log(wandb_log_data)
 
     print("Training complete.")
 
@@ -316,8 +317,9 @@ def main(
     stats = evaluate_vllm(
         vllm, r1_zero_reward_fn, validation_data_prompts, validation_data_answers, eval_sampling_params
     )
-    print(f"Final Accuracy: {stats["correct"] / stats["count"]:.4f}")
-    wandb.log({"eval/final_accuracy": stats["correct"] / stats["count"]})
+    accuracy = stats["eval/correct"] / len(validation_data_prompts)
+    print(f"Final Accuracy: {accuracy:.4f}")
+    wandb.log({"eval/final_accuracy": accuracy})
 
     # --- Save Model ---
     print(f"Saving model to {output_dir}...")
@@ -330,3 +332,5 @@ def main(
 
     wandb.finish()
 
+if __name__ == "__main__":
+    typer.run(main)
